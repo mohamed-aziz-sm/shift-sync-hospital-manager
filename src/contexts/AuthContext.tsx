@@ -1,88 +1,107 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Session, User } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from "sonner";
-
-export type UserRole = 'admin' | 'doctor';
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-}
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  session: Session | null;
   loading: boolean;
+  login: (email: string, password: string) => Promise<boolean>;
+  signup: (email: string, password: string, name: string, role?: 'admin' | 'doctor') => Promise<boolean>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// In a real app, this would be fetched from an API
-const mockUsers = [
-  {
-    id: '1',
-    name: 'Admin User',
-    email: 'admin@hospital.com',
-    password: 'admin123',
-    role: 'admin' as UserRole,
-  },
-  {
-    id: '2',
-    name: 'Dr. John Doe',
-    email: 'doctor@hospital.com',
-    password: 'doctor123',
-    role: 'doctor' as UserRole,
-    group: 1,
-    specialty: 'Cardiology',
-  },
-];
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored user session
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error('Failed to parse stored user:', error);
+    // Set up auth state listener first
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, currentSession) => {
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
       }
-    }
-    setLoading(false);
+    );
+
+    // Then check for existing session
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // In a real app, this would be an API call
-    const foundUser = mockUsers.find(
-      (u) => u.email === email && u.password === password
-    );
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      
+      if (error) {
+        toast.error(error.message);
+        return false;
+      }
 
-    if (foundUser) {
-      const { password, ...userWithoutPassword } = foundUser;
-      setUser(userWithoutPassword);
-      localStorage.setItem('user', JSON.stringify(userWithoutPassword));
-      toast.success(`Welcome back, ${userWithoutPassword.name}!`);
+      toast.success('Successfully logged in');
       return true;
+    } catch (error) {
+      toast.error('An error occurred during login');
+      return false;
     }
-    
-    toast.error('Invalid email or password');
-    return false;
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-    toast.info('You have been logged out');
+  const signup = async (
+    email: string, 
+    password: string, 
+    name: string,
+    role: 'admin' | 'doctor' = 'doctor'
+  ): Promise<boolean> => {
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+            role,
+          },
+        },
+      });
+
+      if (error) {
+        toast.error(error.message);
+        return false;
+      }
+
+      toast.success('Registration successful! Please check your email to verify your account.');
+      return true;
+    } catch (error) {
+      toast.error('An error occurred during registration');
+      return false;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success('Successfully logged out');
+      }
+    } catch (error) {
+      toast.error('An error occurred during logout');
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, session, loading, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );
