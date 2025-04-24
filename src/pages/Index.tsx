@@ -1,19 +1,12 @@
 
-import React, { useEffect } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import Dashboard from './Dashboard';
 import Layout from '@/components/Layout';
 
 const Index = () => {
   const { user, loading } = useAuth();
-  const navigate = useNavigate();
-  
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/login');
-    }
-  }, [loading, user, navigate]);
   
   if (loading) {
     return (
@@ -24,7 +17,7 @@ const Index = () => {
   }
   
   if (!user) {
-    return null; // Redirect will happen via the useEffect
+    return <Navigate to="/login" />;
   }
   
   return (

@@ -1,264 +1,260 @@
 
 import React, { useState } from 'react';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isWeekend } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar } from '@/components/ui/calendar';
-import { toast } from "sonner";
-import { format } from 'date-fns';
-import { CalendarIcon, FileText, RefreshCw } from 'lucide-react';
-import { 
-  Popover, 
-  PopoverContent, 
-  PopoverTrigger 
-} from '@/components/ui/popover';
-import { useAuth } from '@/contexts/AuthContext';
-import { cn } from '@/lib/utils';
+import { ChevronLeft, ChevronRight, Download, Calendar } from 'lucide-react';
+import { STATIONS, Shift, MOCK_DOCTORS } from '@/types';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+// Define the props for a day cell in the calendar
+interface DayProps {
+  day: Date;
+  displayMonth: Date;
+  shifts: Shift[];
+}
+
+// Mock data for shifts
+const generateMockShifts = (): Shift[] => {
+  const shifts: Shift[] = [];
+  const currentDate = new Date();
+  const month = currentDate.getMonth();
+  const year = currentDate.getFullYear();
+
+  // Generate 20 random shifts for the current month
+  for (let i = 0; i < 20; i++) {
+    const randomDay = Math.floor(Math.random() * 28) + 1;
+    const randomStationIndex = Math.floor(Math.random() * STATIONS.length);
+    const randomDoctorIndex = Math.floor(Math.random() * MOCK_DOCTORS.length);
+    
+    const date = new Date(year, month, randomDay);
+    const isWeekendShift = isWeekend(date);
+    
+    let startTime, endTime;
+    if (isWeekendShift) {
+      startTime = `${year}-${month + 1}-${randomDay}T08:00:00`;
+      endTime = `${year}-${month + 1}-${randomDay + 1}T08:00:00`;
+    } else {
+      startTime = `${year}-${month + 1}-${randomDay}T16:00:00`;
+      endTime = `${year}-${month + 1}-${randomDay + 1}T09:00:00`;
+    }
+
+    shifts.push({
+      id: `shift-${i}`,
+      stationId: STATIONS[randomStationIndex].id,
+      doctorId: MOCK_DOCTORS[randomDoctorIndex].id,
+      date: `${year}-${month + 1}-${randomDay}`,
+      startTime,
+      endTime,
+      type: isWeekendShift ? 'weekend' : 'weekday',
+    });
+  }
+
+  return shifts;
+};
+
+const mockShifts = generateMockShifts();
 
 const Schedule = () => {
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
-  const [date, setDate] = useState<Date | undefined>(new Date());
-  const [monthDate, setMonthDate] = useState<Date>(new Date());
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedStation, setSelectedStation] = useState<string | null>(null);
 
-  const generateSchedule = () => {
-    setIsGenerating(true);
-    
-    // Simulate schedule generation
-    setTimeout(() => {
-      setIsGenerating(false);
-      toast.success('Schedule generated successfully');
-    }, 1500);
+  const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
+  const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
+
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+
+  const filteredShifts = selectedStation
+    ? mockShifts.filter(shift => shift.stationId === selectedStation)
+    : mockShifts;
+
+  const getShiftsForDay = (day: Date) => {
+    const dateString = `${day.getFullYear()}-${day.getMonth() + 1}-${day.getDate()}`;
+    return filteredShifts.filter(shift => shift.date === dateString);
   };
 
-  // Mock shifts for the selected month
-  const mockShifts = [
-    { date: new Date(2025, 3, 15), station: 'Réanimation', type: 'weekday' },
-    { date: new Date(2025, 3, 18), station: 'Weaning', type: 'weekday' },
-    { date: new Date(2025, 3, 22), station: 'Visite MedI', type: 'weekend' },
-  ];
-
-  // Function to check if a date has a shift
-  const hasShift = (date: Date) => {
-    return mockShifts.some(shift => 
-      shift.date.getDate() === date.getDate() && 
-      shift.date.getMonth() === date.getMonth() &&
-      shift.date.getFullYear() === date.getFullYear()
-    );
+  // Function to determine the cell class based on the day
+  const getDayClass = (day: Date, currentMonth: Date): string => {
+    let classes = "h-24 border p-1 transition-all";
+    
+    if (!isSameMonth(day, currentMonth)) {
+      classes += " bg-gray-100 text-gray-400";
+    } else if (isWeekend(day)) {
+      classes += " bg-blue-50";
+    }
+    
+    if (isToday(day)) {
+      classes += " border-2 border-primary";
+    }
+    
+    return classes;
   };
 
-  const getShiftType = (date: Date) => {
-    const shift = mockShifts.find(shift => 
-      shift.date.getDate() === date.getDate() && 
-      shift.date.getMonth() === date.getMonth() &&
-      shift.date.getFullYear() === date.getFullYear()
-    );
+  // Component for a single day cell
+  const DayCell = ({ day, displayMonth, shifts }: DayProps) => {
+    const dayShifts = getShiftsForDay(day);
+    const dayClass = getDayClass(day, displayMonth);
     
-    return shift?.type;
+    return (
+      <div className={dayClass}>
+        <div className="flex justify-between">
+          <span className="font-semibold">{format(day, 'd')}</span>
+          {isToday(day) && (
+            <span className="bg-primary text-white text-xs px-1 rounded">Today</span>
+          )}
+        </div>
+        <div className="mt-1">
+          {dayShifts.map((shift) => {
+            const station = STATIONS.find(s => s.id === shift.stationId);
+            const doctor = MOCK_DOCTORS.find(d => d.id === shift.doctorId);
+            
+            return (
+              <div 
+                key={shift.id} 
+                className="text-xs bg-blue-100 p-1 mb-1 rounded truncate"
+                title={`${station?.name} - ${doctor?.name}`}
+              >
+                {station?.name}: {doctor?.name}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Schedule</h1>
-          <p className="text-muted-foreground mt-1">
-            {isAdmin 
-              ? 'Manage and generate hospital shift schedules'
-              : 'View your shift calendar and manage availability'
-            }
-          </p>
-        </div>
-
-        <div className="flex gap-2">
-          {isAdmin && (
-            <Button onClick={generateSchedule} disabled={isGenerating}>
-              {isGenerating ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Generate Schedule
-                </>
-              )}
+        <h1 className="text-2xl font-bold">Schedule Management</h1>
+        <Button variant="outline" className="flex items-center gap-2">
+          <Download className="h-4 w-4" />
+          Export Schedule
+        </Button>
+      </div>
+      
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Schedule Calendar
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={prevMonth}>
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-          )}
-          
-          <Button variant="outline">
-            <FileText className="h-4 w-4 mr-2" />
-            Export as PDF
-          </Button>
-          
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline">
-                <CalendarIcon className="h-4 w-4 mr-2" />
-                {monthDate ? format(monthDate, 'MMMM yyyy') : 'Pick a month'}
+            <div className="font-semibold min-w-[140px] text-center">
+              {format(currentMonth, 'MMMM yyyy')}
+            </div>
+            <Button variant="outline" size="sm" onClick={nextMonth}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={selectedStation === null ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedStation(null)}
+              >
+                All Stations
               </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0">
-              <Calendar
-                mode="single"
-                selected={monthDate}
-                onSelect={(date) => date && setMonthDate(date)}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Card className="col-span-1 md:col-span-2 lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Monthly View - {format(monthDate, 'MMMM yyyy')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="p-1 border rounded-md">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={setDate}
-                className="rounded-md"
-                month={monthDate}
-                onMonthChange={setMonthDate}
-                modifiers={{
-                  hasShift: (date) => hasShift(date),
-                }}
-                modifiersClassNames={{
-                  hasShift: "bg-primary text-primary-foreground",
-                }}
-                components={{
-                  Day: ({ day, ...props }) => {
-                    const isShiftDay = hasShift(day);
-                    const shiftType = getShiftType(day);
-                    
-                    return (
-                      <Button
-                        {...props}
-                        variant="ghost"
-                        className={cn(
-                          "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
-                          props.className,
-                          isShiftDay && shiftType === 'weekend' ? "bg-medical-amber/20 hover:bg-medical-amber/30 text-foreground" : "",
-                          isShiftDay && shiftType === 'weekday' ? "bg-medical-blue/20 hover:bg-medical-blue/30 text-foreground" : ""
-                        )}
-                      >
-                        {format(day, "d")}
-                      </Button>
-                    );
-                  },
-                }}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {date ? (
-                <>Shifts for {format(date, 'MMMM d, yyyy')}</>
-              ) : (
-                <>Select a date</>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {date && hasShift(date) ? (
-              <div className="space-y-4">
-                {mockShifts
-                  .filter(shift => 
-                    shift.date.getDate() === date.getDate() && 
-                    shift.date.getMonth() === date.getMonth() &&
-                    shift.date.getFullYear() === date.getFullYear()
-                  )
-                  .map((shift, index) => (
-                    <div 
-                      key={index} 
-                      className="border rounded-md p-3"
-                    >
-                      <div className="flex justify-between items-center">
-                        <div className="font-medium">{shift.station}</div>
-                        <div className={cn(
-                          "px-2 py-0.5 rounded-full text-xs font-medium",
-                          shift.type === 'weekend' 
-                            ? "bg-medical-amber/10 text-medical-amber"
-                            : "bg-medical-blue/10 text-medical-blue"
-                        )}>
-                          {shift.type === 'weekend' ? 'Weekend' : 'Weekday'}
-                        </div>
-                      </div>
-                      <div className="text-sm text-muted-foreground mt-1">
-                        {shift.type === 'weekend' 
-                          ? '08:00 - 08:00 (24h)'
-                          : '16:00 - 09:00'
-                        }
-                      </div>
-                      <div className="text-sm mt-2">
-                        <span className="font-medium">Assigned doctor:</span> {user?.name || 'Dr. John Doe'}
-                      </div>
-                    </div>
-                  ))
-                }
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                {date ? 'No shifts scheduled for this date' : 'Select a date to view shifts'}
-              </div>
-            )}
-            
-            {!isAdmin && date && (
-              <div className="mt-4">
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => {
-                    toast.success(`Marked ${format(date, 'MMM d, yyyy')} as unavailable`);
-                  }}
+              {STATIONS.map((station) => (
+                <Button
+                  key={station.id}
+                  variant={selectedStation === station.id ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedStation(station.id)}
                 >
-                  Mark as Unavailable
+                  {station.name}
                 </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {isAdmin && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Hospital Stations Overview</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {['Réanimation', 'Weaning', 'Urgence', 'Périphérie', 'Visite MedI', 'Visite MedH'].map((station) => (
-                  <div key={station} className="border rounded-md p-3">
-                    <div className="font-medium">{station}</div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      4 shifts this month
-                    </div>
-                    <div className="flex justify-between mt-2">
-                      <div className="text-xs">
-                        <span className="inline-block w-2 h-2 rounded-full bg-medical-blue mr-1"></span>
-                        Weekday: 3
-                      </div>
-                      <div className="text-xs">
-                        <span className="inline-block w-2 h-2 rounded-full bg-medical-amber mr-1"></span>
-                        Weekend: 1
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+          
+          <div className="grid grid-cols-7 gap-px bg-gray-200">
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+              <div
+                key={day}
+                className="bg-white p-2 text-center font-semibold text-sm"
+              >
+                {day}
+              </div>
+            ))}
+            
+            {/* Generate empty cells for days not in the current month */}
+            {Array.from({ length: monthStart.getDay() }).map((_, index) => (
+              <div key={`empty-start-${index}`} className="bg-gray-50 h-24" />
+            ))}
+            
+            {/* Generate cells for each day in the month */}
+            {days.map((day) => (
+              <DayCell 
+                key={day.toISOString()} 
+                day={day} 
+                displayMonth={currentMonth} 
+                shifts={getShiftsForDay(day)} 
+              />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Shifts List</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Station</TableHead>
+                <TableHead>Doctor</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Time</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredShifts.slice(0, 10).map((shift) => {
+                const station = STATIONS.find(s => s.id === shift.stationId);
+                const doctor = MOCK_DOCTORS.find(d => d.id === shift.doctorId);
+                
+                return (
+                  <TableRow key={shift.id}>
+                    <TableCell>{shift.date}</TableCell>
+                    <TableCell>{station?.name}</TableCell>
+                    <TableCell>{doctor?.name}</TableCell>
+                    <TableCell>
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        shift.type === 'weekend' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {shift.type === 'weekend' ? 'Weekend' : 'Weekday'}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {new Date(shift.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {' - '}
+                      {new Date(shift.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 };
