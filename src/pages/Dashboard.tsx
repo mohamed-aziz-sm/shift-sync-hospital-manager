@@ -1,226 +1,193 @@
-
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Hospital, Users, Calendar, Clock, BedDouble } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { MOCK_DOCTORS, STATIONS } from '@/types';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { supabase } from '@/integrations/supabase/client';
+import { format, parseISO, startOfToday, endOfToday, addDays } from 'date-fns';
+import { CalendarIcon, Clock, CheckCircle, XCircle, Users } from 'lucide-react';
 
 const Dashboard = () => {
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const { user, profile } = useAuth();
+  const [todayShifts, setTodayShifts] = useState([]);
+  const [upcomingShifts, setUpcomingShifts] = useState([]);
+  const [doctorsCount, setDoctorsCount] = useState(0);
+  const [shiftCounts, setShiftCounts] = useState({ today: 0, upcoming: 0 });
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Stats for admin dashboard
-  const stats = [
-    {
-      title: 'Total Doctors',
-      value: MOCK_DOCTORS.length,
-      icon: <Users className="h-8 w-8 text-medical-blue" />,
-      description: 'Registered medical staff'
-    },
-    {
-      title: 'Total Stations',
-      value: STATIONS.length,
-      icon: <Hospital className="h-8 w-8 text-medical-teal" />,
-      description: 'Active hospital stations'
-    },
-    {
-      title: 'Upcoming Shifts',
-      value: 12, // Mock value
-      icon: <Clock className="h-8 w-8 text-medical-amber" />,
-      description: 'In the next 7 days'
-    },
-    {
-      title: 'Total Beds',
-      value: 120, // Mock value
-      icon: <BedDouble className="h-8 w-8 text-medical-red" />,
-      description: 'Available hospital beds'
-    }
-  ];
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Fetch doctors count
+        const { data: doctors, error: doctorsError } = await supabase
+          .from('doctors')
+          .select('id', { count: 'exact' });
+          
+        if (doctorsError) throw doctorsError;
+        setDoctorsCount(doctors?.length || 0);
+        
+        // Fetch shifts for today and upcoming
+        const today = format(startOfToday(), 'yyyy-MM-dd');
+        const tomorrow = format(addDays(startOfToday(), 1), 'yyyy-MM-dd');
+        const nextWeek = format(addDays(startOfToday(), 7), 'yyyy-MM-dd');
+        
+        const welcomeMessage = profile ? `Welcome, ${profile.name}! Here's your dashboard.` : 
+          "Welcome to ShiftSync Hospital Manager!";
+          
+        toast.success(welcomeMessage);
+        
+        // Continue with fetching shift data
+        const { data: todayShiftsData, error: todayShiftsError } = await supabase
+          .from('shifts')
+          .select(`
+            id, date, start_time, end_time, type,
+            stations (name),
+            doctors (name)
+          `)
+          .eq('date', today);
+          
+        if (todayShiftsError) throw todayShiftsError;
+        setTodayShifts(todayShiftsData || []);
+        setShiftCounts(prev => ({ ...prev, today: todayShiftsData?.length || 0 }));
+        
+        const { data: upcomingShiftsData, error: upcomingShiftsError } = await supabase
+          .from('shifts')
+          .select(`
+            id, date, start_time, end_time, type,
+            stations (name),
+            doctors (name)
+          `)
+          .gte('date', tomorrow)
+          .lte('date', nextWeek)
+          .order('date', { ascending: true });
+          
+        if (upcomingShiftsError) throw upcomingShiftsError;
+        setUpcomingShifts(upcomingShiftsData || []);
+        setShiftCounts(prev => ({ ...prev, upcoming: upcomingShiftsData?.length || 0 }));
+        
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        toast.error('Failed to load dashboard data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchDashboardData();
+  }, [profile]);
+
+  const renderShiftItem = (shift) => (
+    <div key={shift.id} className="border rounded-md p-4 mb-2">
+      <div className="flex justify-between items-center">
+        <div className="font-semibold">{shift.stations?.name}</div>
+        <div className="text-sm text-gray-500">{shift.type}</div>
+      </div>
+      <div className="text-sm">
+        {format(parseISO(shift.start_time), 'HH:mm')} - {format(parseISO(shift.end_time), 'HH:mm')}
+      </div>
+      <div className="text-sm text-gray-600">Doctor: {shift.doctors?.name}</div>
+    </div>
+  );
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Welcome, {user?.name}</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground mt-1">
-          {isAdmin 
-            ? 'Manage your hospital resources and staff schedules'
-            : 'View your upcoming shifts and manage your availability'
-          }
+          {profile ? `Welcome, ${profile.name}! Here's your dashboard.` : "Welcome to ShiftSync Hospital Manager!"}
         </p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {isAdmin && stats.map((stat, i) => (
-          <Card key={i}>
-            <CardHeader className="pb-2 flex flex-row items-center justify-between">
-              <CardTitle className="text-lg font-medium">{stat.title}</CardTitle>
-              <div>{stat.icon}</div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{stat.value}</div>
-              <CardDescription>{stat.description}</CardDescription>
-            </CardContent>
-          </Card>
-        ))}
+      <Tabs defaultValue="today" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="today" className="relative">
+            Today <Badge className="ml-2 absolute -top-1 right-0">{shiftCounts.today}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="upcoming" className="relative">
+            Upcoming <Badge className="ml-2 absolute -top-1 right-0">{shiftCounts.upcoming}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="summary">Summary</TabsTrigger>
+        </TabsList>
 
-        {!isAdmin && (
-          <>
-            <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                <CardTitle className="text-lg font-medium">Your Next Shift</CardTitle>
-                <div><Calendar className="h-8 w-8 text-medical-blue" /></div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">Tomorrow</div>
-                <CardDescription>Réanimation - 16:00 to 09:00</CardDescription>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                <CardTitle className="text-lg font-medium">Upcoming Weekend</CardTitle>
-                <div><Calendar className="h-8 w-8 text-medical-amber" /></div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">Not Scheduled</div>
-                <CardDescription>You have no weekend shifts this week</CardDescription>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                <CardTitle className="text-lg font-medium">Monthly Shifts</CardTitle>
-                <div><Clock className="h-8 w-8 text-medical-teal" /></div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">5</div>
-                <CardDescription>Total shifts this month</CardDescription>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                <CardTitle className="text-lg font-medium">Unavailability</CardTitle>
-                <div><Calendar className="h-8 w-8 text-medical-red" /></div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">3 Days</div>
-                <CardDescription>Marked as unavailable this month</CardDescription>
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
-
-      {/* Admin only content */}
-      {isAdmin && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <TabsContent value="today" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
+              <CardTitle className="flex items-center"><Clock className="mr-2 h-4 w-4" /> Today's Shifts</CardTitle>
+              <CardDescription>Overview of shifts scheduled for today.</CardDescription>
             </CardHeader>
             <CardContent>
-              <ul className="space-y-2">
-                <li className="flex items-start justify-between border-b pb-2">
-                  <div>
-                    <p className="font-medium">Dr. Jane Smith updated availability</p>
-                    <p className="text-sm text-muted-foreground">Marked 3 days as unavailable</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">2 hours ago</span>
-                </li>
-                <li className="flex items-start justify-between border-b pb-2">
-                  <div>
-                    <p className="font-medium">Schedule generated</p>
-                    <p className="text-sm text-muted-foreground">May 2025 schedule created</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">Yesterday</span>
-                </li>
-                <li className="flex items-start justify-between border-b pb-2">
-                  <div>
-                    <p className="font-medium">Dr. John Doe added</p>
-                    <p className="text-sm text-muted-foreground">New doctor in Group 1</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">2 days ago</span>
-                </li>
-                <li className="flex items-start justify-between">
-                  <div>
-                    <p className="font-medium">Shift swap requested</p>
-                    <p className="text-sm text-muted-foreground">Between Dr. Johnson and Dr. Williams</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">3 days ago</span>
-                </li>
-              </ul>
+              {isLoading ? (
+                <div className="flex justify-center items-center py-8">
+                  Loading shifts...
+                </div>
+              ) : todayShifts.length > 0 ? (
+                todayShifts.map(renderShiftItem)
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No shifts scheduled for today.
+                </div>
+              )}
             </CardContent>
           </Card>
-          
+        </TabsContent>
+
+        <TabsContent value="upcoming" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Station Overview</CardTitle>
+              <CardTitle className="flex items-center"><CalendarIcon className="mr-2 h-4 w-4" /> Upcoming Shifts</CardTitle>
+              <CardDescription>Shifts scheduled for the next 7 days.</CardDescription>
             </CardHeader>
             <CardContent>
-              <ul className="space-y-2">
-                {STATIONS.map((station) => (
-                  <li key={station.id} className="flex items-center justify-between border-b pb-2 last:border-0">
-                    <div className="flex items-center">
-                      <div className="h-2 w-2 rounded-full bg-medical-blue mr-2"></div>
-                      <span>{station.name}</span>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Groups: {station.allowedGroups.join(', ')}
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              {isLoading ? (
+                <div className="flex justify-center items-center py-8">
+                  Loading shifts...
+                </div>
+              ) : upcomingShifts.length > 0 ? (
+                upcomingShifts.map(renderShiftItem)
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No upcoming shifts scheduled.
+                </div>
+              )}
             </CardContent>
           </Card>
-        </div>
-      )}
+        </TabsContent>
 
-      {/* Doctor specific content */}
-      {!isAdmin && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Your Upcoming Shifts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="border-b pb-2">
-                <div className="font-medium">Tuesday, April 26, 2025</div>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <span className="text-sm font-medium">Réanimation</span>
-                    <span className="text-xs text-muted-foreground ml-2">16:00 - 09:00</span>
-                  </div>
-                  <div className="px-2 py-1 rounded-full text-xs font-medium bg-medical-blue/10 text-medical-blue">Weekday</div>
-                </div>
-              </div>
-              
-              <div className="border-b pb-2">
-                <div className="font-medium">Friday, April 29, 2025</div>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <span className="text-sm font-medium">Weaning</span>
-                    <span className="text-xs text-muted-foreground ml-2">16:00 - 09:00</span>
-                  </div>
-                  <div className="px-2 py-1 rounded-full text-xs font-medium bg-medical-blue/10 text-medical-blue">Weekday</div>
-                </div>
-              </div>
-              
-              <div>
-                <div className="font-medium">Sunday, May 8, 2025</div>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <span className="text-sm font-medium">Visite MedI</span>
-                    <span className="text-xs text-muted-foreground ml-2">08:00 - 08:00</span>
-                  </div>
-                  <div className="px-2 py-1 rounded-full text-xs font-medium bg-medical-amber/10 text-medical-amber">Weekend</div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+        <TabsContent value="summary" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center"><Users className="mr-2 h-4 w-4" /> Total Doctors</CardTitle>
+                <CardDescription>Number of doctors in the system.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{doctorsCount}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center"><Clock className="mr-2 h-4 w-4" /> Today's Shifts</CardTitle>
+                <CardDescription>Number of shifts scheduled for today.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{shiftCounts.today}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center"><CalendarIcon className="mr-2 h-4 w-4" /> Upcoming Shifts</CardTitle>
+                <CardDescription>Number of shifts in the next 7 days.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{shiftCounts.upcoming}</div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

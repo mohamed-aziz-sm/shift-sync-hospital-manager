@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 // Sample doctors grouped by their group number
@@ -371,19 +370,12 @@ export const seedDoctors = async () => {
       return false;
     }
 
-    // Add placeholder user_id to all doctors (in production, these would be real user IDs)
-    const doctorsWithUserId = sampleDoctors.map(doctor => ({
-      ...doctor,
-      user_id: '00000000-0000-0000-0000-000000000000' // placeholder
-    }));
+    // Fix for the foreign key constraint issue
+    // We'll remove the user_id reference since we don't have actual users for these seeded doctors
+    const { error } = await supabase.rpc('seed_doctors', { doctors: sampleDoctors });
 
-    // Insert all sample doctors
-    const { error: insertError } = await supabase
-      .from('doctors')
-      .insert(doctorsWithUserId);
-
-    if (insertError) {
-      console.error('Error seeding doctors:', insertError);
+    if (error) {
+      console.error('Error seeding doctors:', error);
       return false;
     }
 
