@@ -4,175 +4,109 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { BedDouble } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { supabase } from '@/integrations/supabase/client';
 
 const Login = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [role, setRole] = useState<'doctor' | 'admin'>('doctor');
-  const [isSignupOpen, setIsSignupOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login, signup } = useAuth();
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
 
-  const handleLogin = async (e: React.FormEvent) => {
+  // If the user is already logged in, redirect to the home page
+  if (user) {
+    navigate('/', { replace: true });
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    setLoading(true);
 
     try {
-      const success = await login(email, password);
-      if (success) {
-        navigate('/');
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+      if (activeTab === 'login') {
+        // Sign in
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+        if (error) throw error;
+        toast.success('Successfully logged in!');
+        navigate('/', { replace: true });
+      } else {
+        // Sign up
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password
+        });
 
-    try {
-      const success = await signup(email, password, name, role);
-      if (success) {
-        setIsSignupOpen(false);
+        if (error) throw error;
+        toast.success('Registration successful! Please check your email for verification.');
       }
+    } catch (error: any) {
+      toast.error(error.message || 'An error occurred');
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background">
-      <div className="w-full max-w-md p-4 animate-fade-in">
+    <div className="min-h-screen flex items-center justify-center bg-muted/40">
+      <div className="w-full max-w-md space-y-6 p-4">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold tracking-tight">ShiftSync Hospital Manager</h1>
+          <p className="text-muted-foreground mt-1">Doctor scheduling made easy</p>
+        </div>
+        
         <Card>
-          <CardHeader className="space-y-4 flex flex-col items-center">
-            <div className="flex items-center justify-center h-12 w-12 bg-medical-blue text-white rounded-full">
-              <BedDouble className="h-6 w-6" />
-            </div>
-            <div className="text-center">
-              <CardTitle className="text-2xl">ShiftSync</CardTitle>
-              <CardDescription>Hospital Management System</CardDescription>
-            </div>
+          <CardHeader>
+            <CardTitle>Welcome</CardTitle>
+            <CardDescription>
+              {activeTab === 'login' ? 'Sign in to your account' : 'Create a new account'}
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Signing in...' : 'Sign In'}
-              </Button>
-            </form>
-          </CardContent>
-          <CardFooter className="flex justify-center">
-            <Dialog open={isSignupOpen} onOpenChange={setIsSignupOpen}>
-              <DialogTrigger asChild>
-                <Button variant="link">Don't have an account? Sign up</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create an Account</DialogTitle>
-                  <DialogDescription>
-                    Enter your details to create a new account.
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSignup} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-name">Full Name</Label>
-                    <Input
-                      id="signup-name"
-                      placeholder="Enter your full name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
-                    <Input
-                      id="signup-password"
-                      type="password"
-                      placeholder="Create a password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="role">Role</Label>
-                    <Select value={role} onValueChange={(value: 'doctor' | 'admin') => setRole(value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select your role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="doctor">Doctor</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <DialogFooter>
-                    <Button type="submit" disabled={isSubmitting}>
-                      {isSubmitting ? 'Creating Account...' : 'Create Account'}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+          <Tabs defaultValue="login" value={activeTab} onValueChange={(v) => setActiveTab(v as 'login' | 'signup')}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="login">Login</TabsTrigger>
+              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            </TabsList>
+            <CardContent className="pt-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Processing...' : activeTab === 'login' ? 'Login' : 'Create account'}
+                </Button>
+              </form>
+            </CardContent>
+          </Tabs>
+          <CardFooter className="flex flex-col">
+            <p className="text-xs text-muted-foreground text-center mt-4">
+              By continuing, you agree to our Terms of Service and Privacy Policy.
+            </p>
           </CardFooter>
         </Card>
       </div>

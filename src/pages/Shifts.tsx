@@ -141,7 +141,6 @@ const Shifts = () => {
 
     try {
       if (isEditing && selectedShift) {
-        // Update existing shift
         const { data, error } = await supabase
           .from('shifts')
           .update({
@@ -166,7 +165,6 @@ const Shifts = () => {
         );
         toast.success('Shift updated successfully');
       } else {
-        // Create new shift
         const newShift = await createShift(stationId, doctorId, formattedDate, startTime, endTime, shiftType);
         setShifts(prevShifts => [...prevShifts, newShift]);
         toast.success('Shift created successfully');
@@ -202,10 +200,10 @@ const Shifts = () => {
             onSelect={(date) => date && setSelectedDate(date)}
             fromDate={new Date()}
             modifiers={{
-              highlighted: highlightedDays.map(day => ({
-                date: day,
-                className: 'bg-primary/20 text-primary'
-              }))
+              highlighted: highlightedDays
+            }}
+            modifiersClassNames={{
+              highlighted: "bg-primary/20 text-primary"
             }}
           />
           {selectedDate && (
@@ -246,8 +244,8 @@ const Shifts = () => {
           <form onSubmit={handleSubmit} className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="station">Station</Label>
-              <Select onValueChange={setStationId} defaultValue={stationId} className="col-span-3">
-                <SelectTrigger id="station">
+              <Select onValueChange={setStationId} defaultValue={stationId}>
+                <SelectTrigger id="station" className="col-span-3">
                   <SelectValue placeholder="Select a station" />
                 </SelectTrigger>
                 <SelectContent>
@@ -259,8 +257,8 @@ const Shifts = () => {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="doctor">Doctor</Label>
-              <Select onValueChange={setDoctorId} defaultValue={doctorId} className="col-span-3">
-                <SelectTrigger id="doctor">
+              <Select onValueChange={setDoctorId} defaultValue={doctorId}>
+                <SelectTrigger id="doctor" className="col-span-3">
                   <SelectValue placeholder="Select a doctor" />
                 </SelectTrigger>
                 <SelectContent>
@@ -292,8 +290,8 @@ const Shifts = () => {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="shiftType">Shift Type</Label>
-              <Select onValueChange={setShiftType} defaultValue={shiftType} className="col-span-3">
-                <SelectTrigger id="shiftType">
+              <Select onValueChange={(value) => setShiftType(value as ShiftType)} defaultValue={shiftType}>
+                <SelectTrigger id="shiftType" className="col-span-3">
                   <SelectValue placeholder="Select shift type" />
                 </SelectTrigger>
                 <SelectContent>

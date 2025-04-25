@@ -6,10 +6,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isSameDay, isWithinInterval } from 'date-fns';
 import { Loader2, CalendarIcon } from 'lucide-react';
 import ScheduleGenerator from '@/components/ScheduleGenerator';
-import { Shift, ShiftType } from '@/types';
+import { Shift, ShiftType, Doctor, Station } from '@/types';
 
 const Schedule = () => {
   const [activeTab, setActiveTab] = useState<string>('view');
@@ -17,12 +17,10 @@ const Schedule = () => {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Function to convert database shift to our Shift type
   const convertToShiftType = (type: string): ShiftType => {
     return type === 'weekday' || type === 'weekend' ? type : 'weekday';
   };
 
-  // Fetch shifts for the selected date
   const fetchShifts = async (date: Date) => {
     setIsLoading(true);
     try {
@@ -66,14 +64,12 @@ const Schedule = () => {
     }
   };
 
-  // Fetch shifts when selected date changes
   useEffect(() => {
     if (activeTab === 'view') {
       fetchShifts(selectedDate);
     }
   }, [selectedDate, activeTab]);
 
-  // Handle successful schedule generation
   const handleScheduleGenerated = async (generatedShifts: any[]) => {
     try {
       const formattedShifts = generatedShifts.map(shift => ({
@@ -88,6 +84,28 @@ const Schedule = () => {
       console.error('Error processing generated shifts:', error);
       toast.error('Error processing generated shifts');
     }
+  };
+
+  const renderShift = (shift: Shift & { station?: Station, doctor?: Doctor }) => {
+    return (
+      <div key={shift.id} className="p-4 border-b last:border-0">
+        <div className="flex justify-between items-center">
+          <div>
+            <h4 className="font-medium">{shift.station?.name}</h4>
+            <p className="text-sm text-gray-500">
+              {format(new Date(`${shift.date}T${shift.start_time}`), 'HH:mm')} - 
+              {format(new Date(`${shift.date}T${shift.end_time}`), 'HH:mm')}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="font-medium">{shift.doctor?.name}</p>
+            <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+              {shift.type}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
