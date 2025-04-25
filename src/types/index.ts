@@ -32,6 +32,8 @@ export interface Shift {
   type: ShiftType;
   created_at?: string;
   updated_at?: string;
+  doctor?: Doctor;
+  station?: Station;
 }
 
 export interface Schedule {
@@ -40,5 +42,3 @@ export interface Schedule {
   year: number;
   shifts: Shift[];
 }
-
-// Remove mock data as it's no longer needed

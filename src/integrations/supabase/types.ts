@@ -199,7 +199,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      seed_doctors: {
+        Args: { doctors: Json }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

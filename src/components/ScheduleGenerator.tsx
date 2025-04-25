@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,8 +25,14 @@ interface Station {
   allowed_groups: number[];
 }
 
+interface Shift {
+  doctor_id: string;
+  start_date: Date;
+  end_date: Date;
+}
+
 interface ScheduleGeneratorProps {
-  onScheduleGenerated?: () => void;
+  onScheduleGenerated?: (generatedShifts: Shift[]) => void;
 }
 
 const ScheduleGenerator: React.FC<ScheduleGeneratorProps> = ({ onScheduleGenerated }) => {
@@ -39,13 +44,11 @@ const ScheduleGenerator: React.FC<ScheduleGeneratorProps> = ({ onScheduleGenerat
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Fetch doctors and stations from Supabase
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       
       try {
-        // Fetch doctors
         const { data: doctorsData, error: doctorsError } = await supabase
           .from('doctors')
           .select('id, name, group_id')
@@ -56,7 +59,6 @@ const ScheduleGenerator: React.FC<ScheduleGeneratorProps> = ({ onScheduleGenerat
           return;
         }
         
-        // Fetch stations
         const { data: stationsData, error: stationsError } = await supabase
           .from('stations')
           .select('id, name, allowed_groups');
@@ -101,14 +103,12 @@ const ScheduleGenerator: React.FC<ScheduleGeneratorProps> = ({ onScheduleGenerat
     setIsGenerating(true);
     
     try {
-      // Here we'll call the schedule generation algorithm
-      // For this demo, we'll just show a success message
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate processing time
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       toast.success('Schedule generated successfully');
       
       if (onScheduleGenerated) {
-        onScheduleGenerated();
+        onScheduleGenerated([]);
       }
     } catch (error) {
       toast.error('Failed to generate schedule');

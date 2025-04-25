@@ -2,151 +2,77 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from "sonner";
 
-interface UserProfile {
+interface Profile {
   id: string;
   name: string;
-  role: 'admin' | 'doctor';
+  role: string;
 }
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null;
-  profile: UserProfile | null;
-  session: Session | null;
+  profile: Profile | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  signup: (email: string, password: string, name: string, role?: 'admin' | 'doctor') => Promise<boolean>;
-  logout: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  profile: null,
+  loading: true,
+  refreshProfile: async () => {},
+});
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Function to fetch user profile from Supabase
-  const fetchProfile = async (userId: string) => {
+  const refreshProfile = async () => {
+    if (!user) return;
+
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', userId)
+        .eq('id', user.id)
         .single();
 
-      if (error) {
-        console.error('Error fetching profile:', error);
-        return null;
-      }
-
-      return data as UserProfile;
+      if (error) throw error;
+      setProfile(data);
     } catch (error) {
-      console.error('Unexpected error fetching profile:', error);
-      return null;
+      console.error('Error loading profile:', error);
     }
   };
 
   useEffect(() => {
-    // Set up auth state listener first
+    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        
-        if (currentSession?.user) {
-          // Use setTimeout to avoid potential supabase deadlocks
-          setTimeout(async () => {
-            const profileData = await fetchProfile(currentSession.user.id);
-            setProfile(profileData);
-          }, 0);
+      async (event, session) => {
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await refreshProfile();
         } else {
           setProfile(null);
         }
+        setLoading(false);
       }
     );
 
-    // Then check for existing session
-    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      
-      if (currentSession?.user) {
-        const profileData = await fetchProfile(currentSession.user.id);
-        setProfile(profileData);
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        refreshProfile();
       }
-      
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      
-      if (error) {
-        toast.error(error.message);
-        return false;
-      }
-
-      toast.success('Successfully logged in');
-      return true;
-    } catch (error) {
-      toast.error('An error occurred during login');
-      return false;
-    }
-  };
-
-  const signup = async (
-    email: string, 
-    password: string, 
-    name: string,
-    role: 'admin' | 'doctor' = 'doctor'
-  ): Promise<boolean> => {
-    try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-            role,
-          },
-        },
-      });
-
-      if (error) {
-        toast.error(error.message);
-        return false;
-      }
-
-      toast.success('Registration successful! Please check your email to verify your account.');
-      return true;
-    } catch (error) {
-      toast.error('An error occurred during registration');
-      return false;
-    }
-  };
-
-  const logout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        toast.error(error.message);
-      } else {
-        toast.success('Successfully logged out');
-      }
-    } catch (error) {
-      toast.error('An error occurred during logout');
-    }
-  };
-
   return (
-    <AuthContext.Provider value={{ user, profile, session, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
@@ -154,7 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;

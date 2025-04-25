@@ -1,11 +1,10 @@
-
 /**
  * API service for making requests to the backend
  * This is a placeholder for future backend integration
  */
 
-import { Doctor, Shift, Schedule, Station } from '@/types';
-import { MOCK_DOCTORS, STATIONS } from '@/types';
+import { Doctor, Station, Shift, Schedule, ShiftType } from '@/types';
+import { supabase } from '@/integrations/supabase/client';
 
 // Base URL for API requests - would be replaced with actual backend URL
 const API_URL = '/api';
@@ -242,4 +241,29 @@ export const authApi = {
     // Mock implementation
     return { message: 'Registration would be handled by the backend' };
   }
+};
+
+export const createShift = async (
+  station_id: string,
+  doctor_id: string,
+  date: string,
+  start_time: string,
+  end_time: string,
+  type: ShiftType
+): Promise<Shift> => {
+  const { data, error } = await supabase
+    .from('shifts')
+    .insert({
+      station_id,
+      doctor_id,
+      date,
+      start_time,
+      end_time,
+      type
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
 };
