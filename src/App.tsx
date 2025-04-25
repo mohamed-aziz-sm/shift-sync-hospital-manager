@@ -1,4 +1,5 @@
 
+import React from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,7 +13,9 @@ import Doctors from "./pages/Doctors";
 import Schedule from "./pages/Schedule";
 import Shifts from "./pages/Shifts";
 import Profile from "./pages/Profile";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
+import { seedDoctors } from "./utils/doctorSeeding";
 
 const queryClient = new QueryClient();
 
@@ -37,7 +40,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 // Admin only route component
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth();
+  const { profile, loading } = useAuth();
 
   if (loading) {
     return (
@@ -47,7 +50,7 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  if (!user || user.role !== 'admin') {
+  if (!profile || profile.role !== 'admin') {
     return <Navigate to="/" replace />;
   }
 
@@ -57,6 +60,13 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 const AppRoutes = () => {
   const { user } = useAuth();
 
+  // Attempt to seed the doctors table when app loads
+  React.useEffect(() => {
+    if (user) {
+      seedDoctors();
+    }
+  }, [user]);
+
   return (
     <Routes>
       <Route path="/login" element={!user ? <Login /> : <Navigate to="/" replace />} />
@@ -65,6 +75,7 @@ const AppRoutes = () => {
       <Route path="/doctors" element={<AdminRoute><Layout><Doctors /></Layout></AdminRoute>} />
       <Route path="/schedule" element={<ProtectedRoute><Layout><Schedule /></Layout></ProtectedRoute>} />
       <Route path="/shifts" element={<ProtectedRoute><Layout><Shifts /></Layout></ProtectedRoute>} />
+      <Route path="/reports" element={<AdminRoute><Layout><Reports /></Layout></AdminRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Layout><Profile /></Layout></ProtectedRoute>} />
       
       <Route path="*" element={<NotFound />} />

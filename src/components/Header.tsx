@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Link } from 'react-router-dom';
 
 interface HeaderProps {
   sidebarCollapsed: boolean;
@@ -19,7 +20,7 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ sidebarCollapsed, setSidebarCollapsed }) => {
-  const { user, logout } = useAuth();
+  const { user, profile, logout } = useAuth();
 
   return (
     <header className="bg-white border-b border-border h-16 flex items-center px-4">
@@ -46,18 +47,20 @@ const Header: React.FC<HeaderProps> = ({ sidebarCollapsed, setSidebarCollapsed }
           <Button variant="ghost" className="flex items-center gap-2">
             <Avatar className="h-8 w-8">
               <AvatarFallback className="bg-medical-blue text-white">
-                {user?.name?.charAt(0)}
+                {profile?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
               </AvatarFallback>
             </Avatar>
-            <span className="hidden md:inline">{user?.name}</span>
+            <span className="hidden md:inline">{profile?.name || user?.email}</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>My Account</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="cursor-pointer">
-            <User className="mr-2 h-4 w-4" />
-            <span>Profile</span>
+          <DropdownMenuItem className="cursor-pointer" asChild>
+            <Link to="/profile">
+              <User className="mr-2 h-4 w-4" />
+              <span>Profile</span>
+            </Link>
           </DropdownMenuItem>
           <DropdownMenuItem className="cursor-pointer" onClick={logout}>
             <LogOut className="mr-2 h-4 w-4" />

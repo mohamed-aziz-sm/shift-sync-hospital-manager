@@ -11,6 +11,7 @@ import {
   Home,
   Users,
   User,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -21,9 +22,9 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
   const location = useLocation();
-  const { user } = useAuth();
+  const { profile } = useAuth();
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = profile?.role === 'admin';
 
   const menuItems = [
     { 
@@ -51,6 +52,12 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
       adminOnly: false
     },
     {
+      name: 'Reports',
+      icon: <FileText className="h-5 w-5" />,
+      path: '/reports',
+      adminOnly: true
+    },
+    {
       name: 'Profile',
       icon: <User className="h-5 w-5" />,
       path: '/profile',
@@ -70,7 +77,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
       <div className="flex items-center justify-between h-16 border-b border-border px-4">
         {!collapsed && (
           <div className="flex items-center">
-            <span className="font-semibold text-lg text-medical-blue">ShiftSync</span>
+            <span className="font-semibold text-lg text-primary">ShiftSync</span>
           </div>
         )}
         <Button 
