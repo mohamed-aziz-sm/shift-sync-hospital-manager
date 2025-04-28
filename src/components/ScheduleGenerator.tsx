@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,7 +36,7 @@ const ScheduleGenerator: React.FC<ScheduleGeneratorProps> = ({ onScheduleGenerat
       try {
         const { data: doctorsData, error: doctorsError } = await supabase
           .from('doctors')
-          .select('id, name, group_id')
+          .select('id, name, email, specialty, group_id')
           .order('name');
           
         if (doctorsError) {
@@ -149,8 +150,35 @@ const ScheduleGenerator: React.FC<ScheduleGeneratorProps> = ({ onScheduleGenerat
         const shiftType: ShiftType = isWeekendDay ? 'weekend' : 'weekday';
         
         for (const station of stations) {
-          const startTime = isWeekendDay ? '08:00:00' : '16:00:00';
-          const endTime = isWeekendDay ? '08:00:00' : '09:00:00';
+          // For weekends: 08:00 to 08:00 next day (24h)
+          // For weekdays: 16:00 to 09:00 next day
+          // We need to format these as ISO strings for the database
+          let startTimeStr: string;
+          let endTimeStr: string;
+          
+          if (isWeekendDay) {
+            // Weekend shift: 8am to 8am next day
+            const startTime = new Date(date);
+            startTime.setHours(8, 0, 0, 0);
+            
+            const endTime = new Date(date);
+            endTime.setDate(endTime.getDate() + 1);
+            endTime.setHours(8, 0, 0, 0);
+            
+            startTimeStr = startTime.toISOString();
+            endTimeStr = endTime.toISOString();
+          } else {
+            // Weekday shift: 4pm to 9am next day
+            const startTime = new Date(date);
+            startTime.setHours(16, 0, 0, 0);
+            
+            const endTime = new Date(date);
+            endTime.setDate(endTime.getDate() + 1);
+            endTime.setHours(9, 0, 0, 0);
+            
+            startTimeStr = startTime.toISOString();
+            endTimeStr = endTime.toISOString();
+          }
           
           const assignedDoctor = assignDoctorToShift(
             availableDoctors, 
@@ -164,8 +192,8 @@ const ScheduleGenerator: React.FC<ScheduleGeneratorProps> = ({ onScheduleGenerat
               doctor_id: assignedDoctor.id,
               station_id: station.id,
               date: dateStr,
-              start_time: startTime,
-              end_time: endTime,
+              start_time: startTimeStr,
+              end_time: endTimeStr,
               type: shiftType
             });
           } else {

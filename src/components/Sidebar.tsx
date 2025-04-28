@@ -65,7 +65,10 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
     }
   ];
 
-  const filteredMenuItems = menuItems.filter(item => !item.adminOnly || isAdmin);
+  // If user is admin, show all items; otherwise, filter out admin-only items
+  const filteredMenuItems = isAdmin 
+    ? menuItems 
+    : menuItems.filter(item => !item.adminOnly);
 
   return (
     <aside 
