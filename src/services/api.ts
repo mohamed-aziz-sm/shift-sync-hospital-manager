@@ -163,9 +163,15 @@ export const shiftsApi = {
   
   // Create multiple shifts at once
   createMany: async (shifts: Array<Omit<Shift, 'id' | 'created_at' | 'updated_at'>>): Promise<Shift[]> => {
+    // Make sure start_time and end_time are properly formatted as ISO strings
+    const formattedShifts = shifts.map(shift => ({
+      ...shift
+      // We no longer need to modify the time strings as they're already in ISO format
+    }));
+
     const { data, error } = await supabase
       .from('shifts')
-      .insert(shifts)
+      .insert(formattedShifts)
       .select();
       
     if (error) throw error;
@@ -186,14 +192,31 @@ export const createShift = async (
   end_time: string,
   type: ShiftType
 ): Promise<Shift> => {
+  // Convert time strings to ISO format
+  const dateObj = new Date(date);
+  
+  // Parse hours and minutes from start_time
+  const [startHours, startMinutes] = start_time.split(':').map(Number);
+  const startDate = new Date(dateObj);
+  startDate.setHours(startHours, startMinutes || 0, 0, 0);
+  
+  // Parse hours and minutes from end_time
+  const [endHours, endMinutes] = end_time.split(':').map(Number);
+  const endDate = new Date(dateObj);
+  // If end time is less than start time, assume it's for the next day
+  if (endHours < startHours) {
+    endDate.setDate(endDate.getDate() + 1);
+  }
+  endDate.setHours(endHours, endMinutes || 0, 0, 0);
+
   const { data, error } = await supabase
     .from('shifts')
     .insert({
       station_id,
       doctor_id,
       date,
-      start_time,
-      end_time,
+      start_time: startDate.toISOString(),
+      end_time: endDate.toISOString(),
       type
     })
     .select()

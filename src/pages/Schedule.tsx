@@ -85,6 +85,16 @@ const Schedule = () => {
     }
   };
 
+  // Function to format time from ISO string
+  const formatTime = (isoString: string) => {
+    try {
+      return format(new Date(isoString), 'h:mm a');
+    } catch (error) {
+      console.error('Error parsing date:', isoString, error);
+      return isoString; // Fallback to original string if parsing fails
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -147,7 +157,7 @@ const Schedule = () => {
                         </div>
                         <div className="text-right">
                           <p className="text-sm">
-                            {format(new Date(`${shift.date}T${shift.start_time}`), 'h:mm a')} - {format(new Date(`${shift.date}T${shift.end_time}`), 'h:mm a')}
+                            {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
                           </p>
                           <span className={`text-xs px-2 py-1 rounded-full ${
                             shift.type === 'weekend' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
