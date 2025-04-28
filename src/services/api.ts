@@ -3,7 +3,7 @@
  * API service for making requests to the backend
  */
 
-import { Doctor, Station, Shift, Schedule, ShiftType } from '@/types';
+import { Doctor, Station, Shift, Schedule, ShiftType, DoctorGroup } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 
 // Base URL for API requests - would be replaced with actual backend URL
@@ -36,7 +36,12 @@ export const doctorsApi = {
       .order('name');
       
     if (error) throw error;
-    return data || [];
+    
+    // Convert the numeric group_id to DoctorGroup type
+    return (data || []).map(doc => ({
+      ...doc,
+      group_id: doc.group_id as DoctorGroup
+    }));
   },
   
   // Get doctor by ID
@@ -48,19 +53,33 @@ export const doctorsApi = {
       .single();
       
     if (error && error.code !== 'PGRST116') throw error;
-    return data;
+    
+    return data ? {
+      ...data,
+      group_id: data.group_id as DoctorGroup
+    } : undefined;
   },
   
   // Create a new doctor
-  create: async (doctor: Omit<Doctor, 'id'>): Promise<Doctor> => {
+  create: async (doctor: Omit<Doctor, 'id' | 'created_at' | 'updated_at'>): Promise<Doctor> => {
     const { data, error } = await supabase
       .from('doctors')
-      .insert(doctor)
+      .insert({
+        name: doctor.name,
+        email: doctor.email,
+        specialty: doctor.specialty,
+        group_id: doctor.group_id,
+        user_id: '00000000-0000-0000-0000-000000000000'
+      })
       .select()
       .single();
       
     if (error) throw error;
-    return data;
+    
+    return {
+      ...data,
+      group_id: data.group_id as DoctorGroup
+    };
   },
   
   // Update a doctor
@@ -73,7 +92,11 @@ export const doctorsApi = {
       .single();
       
     if (error) throw error;
-    return data;
+    
+    return {
+      ...data,
+      group_id: data.group_id as DoctorGroup
+    };
   },
   
   // Delete a doctor
@@ -97,7 +120,11 @@ export const stationsApi = {
       .order('name');
       
     if (error) throw error;
-    return data || [];
+    
+    return (data || []).map(station => ({
+      ...station,
+      allowed_groups: station.allowed_groups as DoctorGroup[]
+    }));
   }
 };
 
@@ -119,7 +146,19 @@ export const shiftsApi = {
       .lte('date', endDate.toISOString().split('T')[0]);
       
     if (error) throw error;
-    return data || [];
+    
+    return (data || []).map(shift => ({
+      ...shift,
+      type: shift.type as ShiftType,
+      doctor: shift.doctor ? {
+        ...shift.doctor,
+        group_id: shift.doctor.group_id as DoctorGroup
+      } : undefined,
+      station: shift.station ? {
+        ...shift.station,
+        allowed_groups: shift.station.allowed_groups as DoctorGroup[]
+      } : undefined
+    }));
   }
 };
 
@@ -146,5 +185,9 @@ export const createShift = async (
     .single();
 
   if (error) throw error;
-  return data;
+  
+  return {
+    ...data,
+    type: data.type as ShiftType
+  };
 };

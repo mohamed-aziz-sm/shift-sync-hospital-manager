@@ -203,6 +203,10 @@ export type Database = {
         Args: { doctors: Json }
         Returns: undefined
       }
+      seed_initial_doctors: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

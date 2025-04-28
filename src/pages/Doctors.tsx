@@ -8,20 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Edit, Plus, Trash, Loader2 } from 'lucide-react';
+import { Edit, Plus, Trash } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from "sonner";
 import { supabase } from '@/integrations/supabase/client';
-
-interface Doctor {
-  id: string;
-  name: string;
-  email: string;
-  specialty: string;
-  group_id: number;
-}
-
-type DoctorGroup = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+import type { Doctor, DoctorGroup } from '@/types';
 
 const Doctors = () => {
   const { profile } = useAuth();
@@ -192,7 +183,7 @@ const Doctors = () => {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Doctors</h1>
@@ -280,57 +271,51 @@ const Doctors = () => {
           <CardTitle>Doctors List</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center items-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Specialty</TableHead>
+                <TableHead>Group</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {doctors.length === 0 ? (
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Specialty</TableHead>
-                  <TableHead>Group</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    No doctors found. Add your first doctor using the button above.
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {doctors.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                      No doctors found. Add your first doctor using the button above.
+              ) : (
+                doctors.map((doctor) => (
+                  <TableRow key={doctor.id}>
+                    <TableCell className="font-medium">{doctor.name}</TableCell>
+                    <TableCell>{doctor.email}</TableCell>
+                    <TableCell>{doctor.specialty}</TableCell>
+                    <TableCell>Group {doctor.group_id}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditClick(doctor)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteDoctor(doctor.id)}
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
-                ) : (
-                  doctors.map((doctor) => (
-                    <TableRow key={doctor.id}>
-                      <TableCell className="font-medium">{doctor.name}</TableCell>
-                      <TableCell>{doctor.email}</TableCell>
-                      <TableCell>{doctor.specialty}</TableCell>
-                      <TableCell>Group {doctor.group_id}</TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditClick(doctor)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteDoctor(doctor.id)}
-                        >
-                          <Trash className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          )}
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
