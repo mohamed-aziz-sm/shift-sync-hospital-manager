@@ -4,16 +4,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Plus, Edit, Trash2 } from 'lucide-react';
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Doctor, Shift, Station, ShiftType } from '@/types';
 import { createShift } from '@/services/api';
-import { cn } from '@/lib/utils';
+
+const formatShiftTime = (startTime: string, endTime: string, type: ShiftType) => {
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  const shiftName = type === 'weekday' ? 'Day Shift' : 'Night Shift';
+  return `${shiftName} (${format(start, 'HH:mm')} - ${format(end, 'HH:mm')})`;
+};
 
 const Shifts = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
@@ -215,10 +220,17 @@ const Shifts = () => {
                 <ul>
                   {shiftsForSelectedDate.map(shift => (
                     <li key={shift.id} className="flex items-center justify-between py-2 border-b">
-                      <span>{shift.doctor?.name} at {shift.station?.name} ({shift.start_time} - {shift.end_time})</span>
+                      <div className="flex flex-col">
+                        <span className="font-medium">
+                          {formatShiftTime(shift.start_time, shift.end_time, shift.type)}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {shift.doctor?.name} at {shift.station?.name}
+                        </span>
+                      </div>
                       <div>
                         <Button variant="ghost" size="icon" onClick={() => handleEditShift(shift)}>
-                          <Edit className="h-4 w-4 mr-2" />
+                          <Edit className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleDeleteShift(shift.id)}>
                           <Trash2 className="h-4 w-4" />

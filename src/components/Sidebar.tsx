@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -65,7 +64,6 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
     }
   ];
 
-  // If user is admin, show all items; otherwise, filter out admin-only items
   const filteredMenuItems = isAdmin 
     ? menuItems 
     : menuItems.filter(item => !item.adminOnly);
