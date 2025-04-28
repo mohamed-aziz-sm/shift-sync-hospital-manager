@@ -71,7 +71,7 @@ const AppRoutes = () => {
       <Route path="/login" element={!user ? <Login /> : <Navigate to="/" replace />} />
       
       <Route path="/" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
-      <Route path="/doctors" element={<AdminRoute><Layout><Doctors /></Layout></AdminRoute>} />
+      <Route path="/doctors" element={<ProtectedRoute><Layout><Doctors /></Layout></ProtectedRoute>} />
       <Route path="/schedule" element={<ProtectedRoute><Layout><Schedule /></Layout></ProtectedRoute>} />
       <Route path="/shifts" element={<ProtectedRoute><Layout><Shifts /></Layout></ProtectedRoute>} />
       <Route path="/reports" element={<AdminRoute><Layout><Reports /></Layout></AdminRoute>} />

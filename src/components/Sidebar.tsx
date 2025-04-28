@@ -37,7 +37,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
       name: 'Doctors',
       icon: <Users className="h-5 w-5" />,
       path: '/doctors',
-      adminOnly: true
+      adminOnly: false
     },
     { 
       name: 'Schedule',
