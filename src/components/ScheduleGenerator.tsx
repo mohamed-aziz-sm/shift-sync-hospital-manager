@@ -6,30 +6,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, CheckCircle, Calendar as CalendarIcon } from 'lucide-react';
+import { Loader2, CheckCircle, Calendar as CalendarIcon, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from 'date-fns';
+import { format, addDays, isWeekend, eachDayOfInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
-
-interface Doctor {
-  id: string;
-  name: string;
-  group_id: number;
-}
-
-interface Station {
-  id: string;
-  name: string;
-  allowed_groups: number[];
-}
-
-interface Shift {
-  doctor_id: string;
-  start_date: Date;
-  end_date: Date;
-}
+import { Doctor, Station, Shift, ShiftType } from '@/types';
+import { shiftsApi } from '@/services/api';
 
 interface ScheduleGeneratorProps {
   onScheduleGenerated?: (generatedShifts: Shift[]) => void;
@@ -68,8 +52,18 @@ const ScheduleGenerator: React.FC<ScheduleGeneratorProps> = ({ onScheduleGenerat
           return;
         }
         
-        setDoctors(doctorsData || []);
-        setStations(stationsData || []);
+        const typedDoctors = (doctorsData || []).map(doc => ({
+          ...doc,
+          group_id: doc.group_id as any
+        }));
+        
+        const typedStations = (stationsData || []).map(station => ({
+          ...station,
+          allowed_groups: station.allowed_groups as any[]
+        }));
+        
+        setDoctors(typedDoctors);
+        setStations(typedStations);
       } catch (error) {
         toast.error('An unexpected error occurred');
         console.error(error);
@@ -89,6 +83,34 @@ const ScheduleGenerator: React.FC<ScheduleGeneratorProps> = ({ onScheduleGenerat
     }
   };
   
+  const assignDoctorToShift = (
+    availableDoctors: Doctor[],
+    station: Station,
+    assignedDoctors: Record<string, string[]>,
+    date: Date
+  ): Doctor | null => {
+    const compatibleDoctors = availableDoctors.filter(doctor => 
+      station.allowed_groups.includes(doctor.group_id as any)
+    );
+    
+    if (compatibleDoctors.length === 0) return null;
+    
+    compatibleDoctors.sort((a, b) => {
+      const aShifts = assignedDoctors[a.id] ? assignedDoctors[a.id].length : 0;
+      const bShifts = assignedDoctors[b.id] ? assignedDoctors[b.id].length : 0;
+      return aShifts - bShifts;
+    });
+    
+    const assignedDoctor = compatibleDoctors[0];
+    
+    if (!assignedDoctors[assignedDoctor.id]) {
+      assignedDoctors[assignedDoctor.id] = [];
+    }
+    assignedDoctors[assignedDoctor.id].push(format(date, 'yyyy-MM-dd'));
+    
+    return assignedDoctor;
+  };
+  
   const generateSchedule = async () => {
     if (!startDate || !endDate) {
       toast.error('Please select both start and end dates');
@@ -99,77 +121,74 @@ const ScheduleGenerator: React.FC<ScheduleGeneratorProps> = ({ onScheduleGenerat
       toast.error('Start date must be before end date');
       return;
     }
-  
+    
+    const availableDoctors = doctors.filter(d => !excludedDoctors.includes(d.id));
+    
+    if (availableDoctors.length === 0) {
+      toast.error('No doctors are available for scheduling');
+      return;
+    }
+    
+    if (stations.length === 0) {
+      toast.error('No stations are available for scheduling');
+      return;
+    }
+    
     setIsGenerating(true);
   
     try {
-      const shifts: Shift[] = [];
-  
-      // Create arrays to store the doctors who are available
-      const availableDoctors = doctors.filter(doctor => !excludedDoctors.includes(doctor.id));
-  
-      // Helper function to format date and add days to it
-      const addDays = (date: Date, days: number): Date => {
-        const newDate = new Date(date);
-        newDate.setDate(newDate.getDate() + days);
-        return newDate;
-      };
-  
-      // Track the last assigned doctor to avoid consecutive shifts
-      let lastAssignedDoctor = -1;
-  
-      // Function to get the next doctor, ensuring no consecutive shifts
-      const getNextDoctor = () => {
-        let doctorIndex = Math.floor(Math.random() * availableDoctors.length);
-        while (doctorIndex === lastAssignedDoctor) {
-          doctorIndex = Math.floor(Math.random() * availableDoctors.length);
+      const assignedDoctors: Record<string, string[]> = {};
+      
+      const dates = eachDayOfInterval({ start: startDate, end: endDate });
+      
+      const generatedShifts: Array<Omit<Shift, 'id' | 'created_at' | 'updated_at'>> = [];
+      
+      for (const date of dates) {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const isWeekendDay = isWeekend(date);
+        const shiftType: ShiftType = isWeekendDay ? 'weekend' : 'weekday';
+        
+        for (const station of stations) {
+          const startTime = isWeekendDay ? '08:00:00' : '16:00:00';
+          const endTime = isWeekendDay ? '08:00:00' : '09:00:00';
+          
+          const assignedDoctor = assignDoctorToShift(
+            availableDoctors, 
+            station, 
+            assignedDoctors, 
+            date
+          );
+          
+          if (assignedDoctor) {
+            generatedShifts.push({
+              doctor_id: assignedDoctor.id,
+              station_id: station.id,
+              date: dateStr,
+              start_time: startTime,
+              end_time: endTime,
+              type: shiftType
+            });
+          } else {
+            console.warn(`Could not find compatible doctor for ${station.name} on ${dateStr}`);
+          }
         }
-        lastAssignedDoctor = doctorIndex;
-        return availableDoctors[doctorIndex];
-      };
-  
-      // Loop through all the days from startDate to endDate
-      let currentDate = new Date(startDate);
-      while (currentDate <= endDate) {
-        // Check if current day is a weekday (Mon-Fri) or weekend (Sat-Sun)
-        const dayOfWeek = currentDate.getDay();
-  
-        if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Weekdays (Mon-Fri)
-          // Assign weekday shifts (16:00 to 09:00 the next day)
-          const doctor = getNextDoctor();
-          const shift: Shift = {
-            doctor_id: doctor.id,
-            start_date: new Date(currentDate.setHours(16, 0, 0)), // 16:00
-            end_date: new Date(addDays(currentDate, 1).setHours(9, 0, 0)), // 09:00 the next day
-          };
-          shifts.push(shift);
-        } else if (dayOfWeek === 6 || dayOfWeek === 0) { // Weekends (Sat-Sun)
-          // Assign weekend shifts (08:00 to 08:00 the next day)
-          const doctor = getNextDoctor();
-          const shift: Shift = {
-            doctor_id: doctor.id,
-            start_date: new Date(currentDate.setHours(8, 0, 0)), // 08:00
-            end_date: new Date(addDays(currentDate, 1).setHours(8, 0, 0)), // 08:00 the next day
-          };
-          shifts.push(shift);
-          console.log('shidts ', shifts)
-        }
-  
-        // Move to the next day
-        currentDate = addDays(currentDate, 1);
       }
-  
-      // Simulate schedule generation delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-  
-      toast.success('Schedule generated successfully');
+      
+      if (generatedShifts.length === 0) {
+        toast.error('No shifts could be generated with the current settings');
+        return;
+      }
+      
+      const createdShifts = await shiftsApi.createMany(generatedShifts);
+      
       if (onScheduleGenerated) {
-        onScheduleGenerated(shifts);
+        onScheduleGenerated(createdShifts);
       }
-  
-    } catch (error) {
-      toast.error('Failed to generate schedule');
-      console.error(error);
+      
+      toast.success(`Successfully generated ${createdShifts.length} shifts`);
+    } catch (error: any) {
+      console.error('Failed to generate schedule:', error);
+      toast.error(`Failed to generate schedule: ${error.message}`);
     } finally {
       setIsGenerating(false);
     }
@@ -274,14 +293,21 @@ const ScheduleGenerator: React.FC<ScheduleGeneratorProps> = ({ onScheduleGenerat
         <div>
           <Label className="mb-2 block">Available Stations</Label>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {stations.map((station) => (
-              <div key={station.id} className="rounded-md border p-3">
-                <p className="font-medium">{station.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  Groups: {station.allowed_groups.map(g => `${g}`).join(', ')}
-                </p>
+            {stations.length > 0 ? (
+              stations.map((station) => (
+                <div key={station.id} className="rounded-md border p-3">
+                  <p className="font-medium">{station.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Groups: {station.allowed_groups.map(g => `${g}`).join(', ')}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-full text-center p-4 border rounded-md text-muted-foreground flex items-center justify-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                No stations found. Please create stations first.
               </div>
-            ))}
+            )}
           </div>
         </div>
       
@@ -335,7 +361,7 @@ const ScheduleGenerator: React.FC<ScheduleGeneratorProps> = ({ onScheduleGenerat
         
         <Button 
           onClick={generateSchedule}
-          disabled={isGenerating || doctors.length === 0 || doctors.length === excludedDoctors.length}
+          disabled={isGenerating || doctors.length === 0 || doctors.length === excludedDoctors.length || stations.length === 0}
           className="w-full"
         >
           {isGenerating ? (

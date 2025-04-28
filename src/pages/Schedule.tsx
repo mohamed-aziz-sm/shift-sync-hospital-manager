@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,8 +39,8 @@ const Schedule = () => {
           doctor_id,
           created_at,
           updated_at,
-          stations (name),
-          doctors (name)
+          station:stations (name),
+          doctor:doctors (name)
         `)
         .eq('date', formattedDate);
         
@@ -70,42 +71,18 @@ const Schedule = () => {
     }
   }, [selectedDate, activeTab]);
 
-  const handleScheduleGenerated = async (generatedShifts: any[]) => {
+  const handleScheduleGenerated = async (generatedShifts: Shift[]) => {
     try {
-      const formattedShifts = generatedShifts.map(shift => ({
-        ...shift,
-        type: convertToShiftType(shift.type)
-      })) as unknown as Shift[];
-      
-      setShifts(formattedShifts);
+      if (generatedShifts && generatedShifts.length > 0) {
+        // Refreshing the shifts to show the newly generated ones
+        await fetchShifts(selectedDate);
+      }
       toast.success('Schedule generated successfully!');
       setActiveTab('view');
     } catch (error) {
       console.error('Error processing generated shifts:', error);
       toast.error('Error processing generated shifts');
     }
-  };
-
-  const renderShift = (shift: Shift & { station?: Station, doctor?: Doctor }) => {
-    return (
-      <div key={shift.id} className="p-4 border-b last:border-0">
-        <div className="flex justify-between items-center">
-          <div>
-            <h4 className="font-medium">{shift.station?.name}</h4>
-            <p className="text-sm text-gray-500">
-              {format(new Date(`${shift.date}T${shift.start_time}`), 'HH:mm')} - 
-              {format(new Date(`${shift.date}T${shift.end_time}`), 'HH:mm')}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="font-medium">{shift.doctor?.name}</p>
-            <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-              {shift.type}
-            </span>
-          </div>
-        </div>
-      </div>
-    );
   };
 
   return (
@@ -155,42 +132,32 @@ const Schedule = () => {
               ) : shifts.length > 0 ? (
                 <div className="space-y-4">
                   {shifts.map((shift) => (
-  <div 
-    key={shift.id} 
-    className="p-4 border rounded-lg bg-background"
-  >
-    <div className="flex justify-between items-start">
-      <div>
-        <h3 className="font-medium">
-          {shift.station?.name || 'Unknown Station'}
-        </h3>
-        <p className="text-sm text-muted-foreground">
-          Doctor: {shift.doctor?.name || 'Unassigned'}
-        </p>
-      </div>
-      <div className="text-right">
-        <p className="text-sm">
-          {shift.date && shift.start_time ? (
-            format(parseISO(`${shift.date}T${shift.start_time}`), 'h:mm a')
-          ) : (
-            'N/A'
-          )}{' '}
-          -{' '}
-          {shift.date && shift.end_time ? (
-            format(parseISO(`${shift.date}T${shift.end_time}`), 'h:mm a')
-          ) : (
-            'N/A'
-          )}
-        </p>
-        <span className={`text-xs px-2 py-1 rounded-full ${
-          shift.type === 'weekend' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-        }`}>
-          {shift.type === 'weekend' ? 'Weekend' : 'Weekday'} Shift
-        </span>
-      </div>
-    </div>
-  </div>
-))}
+                    <div 
+                      key={shift.id} 
+                      className="p-4 border rounded-lg bg-background"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-medium">
+                            {shift.station?.name || 'Unknown Station'}
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            Doctor: {shift.doctor?.name || 'Unassigned'}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm">
+                            {format(new Date(`${shift.date}T${shift.start_time}`), 'h:mm a')} - {format(new Date(`${shift.date}T${shift.end_time}`), 'h:mm a')}
+                          </p>
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            shift.type === 'weekend' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {shift.type === 'weekend' ? 'Weekend' : 'Weekday'} Shift
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
