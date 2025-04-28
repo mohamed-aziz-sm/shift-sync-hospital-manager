@@ -159,6 +159,21 @@ export const shiftsApi = {
         allowed_groups: shift.station.allowed_groups as DoctorGroup[]
       } : undefined
     }));
+  },
+  
+  // Create multiple shifts at once
+  createMany: async (shifts: Array<Omit<Shift, 'id' | 'created_at' | 'updated_at'>>): Promise<Shift[]> => {
+    const { data, error } = await supabase
+      .from('shifts')
+      .insert(shifts)
+      .select();
+      
+    if (error) throw error;
+    
+    return (data || []).map(shift => ({
+      ...shift,
+      type: shift.type as ShiftType
+    }));
   }
 };
 

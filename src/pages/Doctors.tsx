@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from "sonner";
 import { supabase } from '@/integrations/supabase/client';
 import type { Doctor, DoctorGroup } from '@/types';
+import { doctorsApi } from '@/services/api';
 
 const Doctors = () => {
   const { profile } = useAuth();
@@ -37,25 +38,15 @@ const Doctors = () => {
     }
   }, [profile, navigate]);
 
-  // Fetch doctors from Supabase
+  // Fetch doctors from API service
   useEffect(() => {
     const fetchDoctors = async () => {
       try {
         setIsLoading(true);
-        const { data, error } = await supabase
-          .from('doctors')
-          .select('*')
-          .order('name');
-
-        if (error) {
-          toast.error('Failed to load doctors: ' + error.message);
-          return;
-        }
-
-        setDoctors(data || []);
-      } catch (error) {
-        toast.error('An unexpected error occurred');
-        console.error(error);
+        const data = await doctorsApi.getAll();
+        setDoctors(data);
+      } catch (error: any) {
+        toast.error('Failed to load doctors: ' + error.message);
       } finally {
         setIsLoading(false);
       }
@@ -75,30 +66,20 @@ const Doctors = () => {
 
   const handleAddDoctor = async () => {
     try {
-      // In a real app, we would create a user in auth and then create the doctor record
-      const { data, error } = await supabase
-        .from('doctors')
-        .insert({
-          name: formData.name,
-          email: formData.email,
-          specialty: formData.specialty,
-          group_id: formData.group_id,
-          user_id: '00000000-0000-0000-0000-000000000000' // placeholder, would be real user_id in production
-        })
-        .select();
+      const newDoctor = await doctorsApi.create({
+        name: formData.name,
+        email: formData.email,
+        specialty: formData.specialty,
+        group_id: formData.group_id,
+        user_id: '00000000-0000-0000-0000-000000000000' // placeholder, would be real user_id in production
+      });
 
-      if (error) {
-        toast.error('Failed to add doctor: ' + error.message);
-        return;
-      }
-
-      setDoctors(prev => [...prev, data[0]]);
+      setDoctors(prev => [...prev, newDoctor]);
       setIsAddDialogOpen(false);
       toast.success('Doctor added successfully');
       resetForm();
-    } catch (error) {
-      toast.error('An unexpected error occurred');
-      console.error(error);
+    } catch (error: any) {
+      toast.error('Failed to add doctor: ' + error.message);
     }
   };
   
@@ -108,7 +89,7 @@ const Doctors = () => {
       name: doctor.name,
       email: doctor.email,
       specialty: doctor.specialty,
-      group_id: doctor.group_id as DoctorGroup,
+      group_id: doctor.group_id,
     });
     setIsEditDialogOpen(true);
   };
@@ -117,54 +98,32 @@ const Doctors = () => {
     if (!currentDoctor) return;
     
     try {
-      const { error } = await supabase
-        .from('doctors')
-        .update({
-          name: formData.name,
-          email: formData.email,
-          specialty: formData.specialty,
-          group_id: formData.group_id,
-        })
-        .eq('id', currentDoctor.id);
-
-      if (error) {
-        toast.error('Failed to update doctor: ' + error.message);
-        return;
-      }
+      const updatedDoctor = await doctorsApi.update(currentDoctor.id, {
+        name: formData.name,
+        email: formData.email,
+        specialty: formData.specialty,
+        group_id: formData.group_id,
+      });
 
       setDoctors(prev => 
-        prev.map(doc => doc.id === currentDoctor.id 
-          ? { ...doc, ...formData }
-          : doc
-        )
+        prev.map(doc => doc.id === currentDoctor.id ? updatedDoctor : doc)
       );
       
       setIsEditDialogOpen(false);
       toast.success('Doctor updated successfully');
       resetForm();
-    } catch (error) {
-      toast.error('An unexpected error occurred');
-      console.error(error);
+    } catch (error: any) {
+      toast.error('Failed to update doctor: ' + error.message);
     }
   };
 
   const handleDeleteDoctor = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('doctors')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        toast.error('Failed to delete doctor: ' + error.message);
-        return;
-      }
-
+      await doctorsApi.delete(id);
       setDoctors(prev => prev.filter(doc => doc.id !== id));
       toast.success('Doctor removed successfully');
-    } catch (error) {
-      toast.error('An unexpected error occurred');
-      console.error(error);
+    } catch (error: any) {
+      toast.error('Failed to delete doctor: ' + error.message);
     }
   };
 
@@ -285,7 +244,9 @@ const Doctors = () => {
               {doctors.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                    No doctors found. Add your first doctor using the button above.
+                    {isLoading ? 
+                      'Loading doctors...' : 
+                      'No doctors found. Add your first doctor using the button above.'}
                   </TableCell>
                 </TableRow>
               ) : (
