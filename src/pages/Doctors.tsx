@@ -157,7 +157,7 @@ const Doctors = () => {
           </p>
         </div>
 
-        {isAdmin && (
+        {(
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -246,13 +246,13 @@ const Doctors = () => {
                 <TableHead>Specialty</TableHead>
                 <TableHead>Group</TableHead>
                 <TableHead>Assigned Shifts</TableHead>
-                {isAdmin && <TableHead className="text-right">Actions</TableHead>}
+                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {doctors.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={isAdmin ? 6 : 5} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={isAdmin ? 6 : 6} className="text-center py-8 text-muted-foreground">
                     {isLoading ? 'Loading doctors...' : 'No doctors found.'}
                   </TableCell>
                 </TableRow>
@@ -264,7 +264,7 @@ const Doctors = () => {
                     <TableCell>{doctor.specialty}</TableCell>
                     <TableCell>Group {doctor.group_id}</TableCell>
                     <TableCell>{doctor.shiftCount}</TableCell>
-                    {isAdmin && (
+                    { (
                       <TableCell className="text-right">
                         <Button
                           variant="ghost"
