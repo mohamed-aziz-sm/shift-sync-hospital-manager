@@ -94,22 +94,79 @@ const ScheduleGenerator: React.FC<ScheduleGeneratorProps> = ({ onScheduleGenerat
       toast.error('Please select both start and end dates');
       return;
     }
-    
+  
     if (startDate > endDate) {
       toast.error('Start date must be before end date');
       return;
     }
-    
+  
     setIsGenerating(true);
-    
+  
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      toast.success('Schedule generated successfully');
-      
-      if (onScheduleGenerated) {
-        onScheduleGenerated([]);
+      const shifts: Shift[] = [];
+  
+      // Create arrays to store the doctors who are available
+      const availableDoctors = doctors.filter(doctor => !excludedDoctors.includes(doctor.id));
+  
+      // Helper function to format date and add days to it
+      const addDays = (date: Date, days: number): Date => {
+        const newDate = new Date(date);
+        newDate.setDate(newDate.getDate() + days);
+        return newDate;
+      };
+  
+      // Track the last assigned doctor to avoid consecutive shifts
+      let lastAssignedDoctor = -1;
+  
+      // Function to get the next doctor, ensuring no consecutive shifts
+      const getNextDoctor = () => {
+        let doctorIndex = Math.floor(Math.random() * availableDoctors.length);
+        while (doctorIndex === lastAssignedDoctor) {
+          doctorIndex = Math.floor(Math.random() * availableDoctors.length);
+        }
+        lastAssignedDoctor = doctorIndex;
+        return availableDoctors[doctorIndex];
+      };
+  
+      // Loop through all the days from startDate to endDate
+      let currentDate = new Date(startDate);
+      while (currentDate <= endDate) {
+        // Check if current day is a weekday (Mon-Fri) or weekend (Sat-Sun)
+        const dayOfWeek = currentDate.getDay();
+  
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Weekdays (Mon-Fri)
+          // Assign weekday shifts (16:00 to 09:00 the next day)
+          const doctor = getNextDoctor();
+          const shift: Shift = {
+            doctor_id: doctor.id,
+            start_date: new Date(currentDate.setHours(16, 0, 0)), // 16:00
+            end_date: new Date(addDays(currentDate, 1).setHours(9, 0, 0)), // 09:00 the next day
+          };
+          shifts.push(shift);
+        } else if (dayOfWeek === 6 || dayOfWeek === 0) { // Weekends (Sat-Sun)
+          // Assign weekend shifts (08:00 to 08:00 the next day)
+          const doctor = getNextDoctor();
+          const shift: Shift = {
+            doctor_id: doctor.id,
+            start_date: new Date(currentDate.setHours(8, 0, 0)), // 08:00
+            end_date: new Date(addDays(currentDate, 1).setHours(8, 0, 0)), // 08:00 the next day
+          };
+          shifts.push(shift);
+          console.log('shidts ', shifts)
+        }
+  
+        // Move to the next day
+        currentDate = addDays(currentDate, 1);
       }
+  
+      // Simulate schedule generation delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+  
+      toast.success('Schedule generated successfully');
+      if (onScheduleGenerated) {
+        onScheduleGenerated(shifts);
+      }
+  
     } catch (error) {
       toast.error('Failed to generate schedule');
       console.error(error);
@@ -117,7 +174,7 @@ const ScheduleGenerator: React.FC<ScheduleGeneratorProps> = ({ onScheduleGenerat
       setIsGenerating(false);
     }
   };
-
+  
   if (isLoading) {
     return (
       <Card>

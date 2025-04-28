@@ -155,32 +155,42 @@ const Schedule = () => {
               ) : shifts.length > 0 ? (
                 <div className="space-y-4">
                   {shifts.map((shift) => (
-                    <div 
-                      key={shift.id} 
-                      className="p-4 border rounded-lg bg-background"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-medium">
-                            {shift.stations?.name || 'Unknown Station'}
-                          </h3>
-                          <p className="text-sm text-muted-foreground">
-                            Doctor: {shift.doctors?.name || 'Unassigned'}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm">
-                            {format(parseISO(shift.start_time), 'h:mm a')} - {format(parseISO(shift.end_time), 'h:mm a')}
-                          </p>
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            shift.type === 'weekend' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {shift.type === 'weekend' ? 'Weekend' : 'Weekday'} Shift
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+  <div 
+    key={shift.id} 
+    className="p-4 border rounded-lg bg-background"
+  >
+    <div className="flex justify-between items-start">
+      <div>
+        <h3 className="font-medium">
+          {shift.station?.name || 'Unknown Station'}
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Doctor: {shift.doctor?.name || 'Unassigned'}
+        </p>
+      </div>
+      <div className="text-right">
+        <p className="text-sm">
+          {shift.date && shift.start_time ? (
+            format(parseISO(`${shift.date}T${shift.start_time}`), 'h:mm a')
+          ) : (
+            'N/A'
+          )}{' '}
+          -{' '}
+          {shift.date && shift.end_time ? (
+            format(parseISO(`${shift.date}T${shift.end_time}`), 'h:mm a')
+          ) : (
+            'N/A'
+          )}
+        </p>
+        <span className={`text-xs px-2 py-1 rounded-full ${
+          shift.type === 'weekend' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+        }`}>
+          {shift.type === 'weekend' ? 'Weekend' : 'Weekday'} Shift
+        </span>
+      </div>
+    </div>
+  </div>
+))}
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
